@@ -1,0 +1,12 @@
+version: '3.1'
+
+services:
+  azarrot:
+    image: ghcr.io/notsyncing/wolsocketproxy:main
+    volumes:
+      # Put your config file here, named wolsocketproxy.conf
+      - /mnt/data/wolsocketproxy/config:/app/config:Z
+    restart: always
+    ports:
+      # Put the local ports in your config here
+      - 12345:12345

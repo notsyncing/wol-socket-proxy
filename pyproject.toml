@@ -1,0 +1,69 @@
+[tool.poetry]
+name = "wolsocketproxy"
+version = "0.1.0"
+description = "A socket proxy with wake-on-lan feature."
+authors = ["Song Fuchang <song.fc@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: System :: Networking"
+]
+
+[tool.poetry.urls]
+Changelog = "https://github.com/notsyncing/wol-socket-proxy/releases"
+Issues = "https://github.com/notsyncing/wol-socket-proxy/issues"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+wakeonlan = "3.1.0"
+dataclass-wizard = "0.28.0"
+icmplib = "3.0.4"
+
+[tool.poetry.dev-dependencies]
+mypy = { version = "*", python = ">=3.11" }
+ruff = { version = "*", python = ">=3.11" }
+
+[tool.poetry.scripts]
+wolsocketproxy = "wolsocketproxy:main"
+
+[tool.ruff]
+line-length = 120
+src = ["wolsocketproxy"]
+target-version = "py311"
+lint.select = ["ALL"]
+lint.ignore = [
+    "COM812",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D107",
+    "D203",
+    "D211",
+    "D213",
+    "EM102",
+    "FBT001",
+    "FBT003",
+    "ISC001",
+    "TRY003",
+    "TRY201",
+]
+
+[tool.mypy]
+disallow_untyped_defs = true # Functions need to be annotated
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+
+[[tool.poetry.source]]
+name = "mirrors"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+priority = "primary"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
