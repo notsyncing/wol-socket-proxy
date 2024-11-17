@@ -7,6 +7,6 @@ services:
       # Put your config file here, named wolsocketproxy.conf
       - /mnt/data/wolsocketproxy/config:/app/config:Z
     restart: always
-    ports:
-      # Put the local ports in your config here
-      - 12345:12345
+    # Only host network can forward wol packets
+    network_mode: host
+

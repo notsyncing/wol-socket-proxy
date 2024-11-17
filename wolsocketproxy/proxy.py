@@ -162,7 +162,7 @@ class Proxy:
 
         self._log.info("Waking up target %s at %s", target_address, target_mac_addr)
 
-        wakeonlan.send_magic_packet(target_mac_addr, interface=target_address)
+        wakeonlan.send_magic_packet(target_mac_addr)
 
         count = 0
 
