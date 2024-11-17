@@ -1,7 +1,7 @@
 version: '3.1'
 
 services:
-  azarrot:
+  wolsocketproxy:
     image: ghcr.io/notsyncing/wolsocketproxy:main
     volumes:
       # Put your config file here, named wolsocketproxy.conf

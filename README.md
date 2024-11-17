@@ -30,7 +30,7 @@ cp wolsocketproxy.conf.example /etc/wolsocketproxy.conf
 
 Modify the config file as your requirements.
 
-Finally, run it
+Finally, run it:
 
 ```
 wolsocketproxy
