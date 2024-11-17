@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wolsocketproxy"
-version = "0.1.0"
+version = "0.1.1"
 description = "A socket proxy with wake-on-lan feature."
 authors = ["Song Fuchang <song.fc@gmail.com>"]
 license = "Apache-2.0"
