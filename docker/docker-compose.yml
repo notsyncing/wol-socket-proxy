@@ -2,7 +2,7 @@ version: '3.1'
 
 services:
   wolsocketproxy:
-    image: ghcr.io/notsyncing/wolsocketproxy:main
+    image: ghcr.io/notsyncing/wol-socket-proxy:main
     volumes:
       # Put your config file here, named wolsocketproxy.conf
       - /mnt/data/wolsocketproxy/config:/app/config:Z
