@@ -172,4 +172,4 @@ class Proxy:
 
             if count > WOL_MAX_WAIT_COUNT:
                 self._log.warning("Target %s still not online after %d seconds!", target_address, count)
-                return
+                raise ConnectionAbortedError(f"Target {target_address} does not wake up")
