@@ -6,7 +6,7 @@ It can forward TCP(bidirectional) and UDP(send-only) traffic from local machine 
 
 ## Requirements
 
-Python 3.11+
+Python 3.12+
 
 The remote machine must accept and respond to ICMP ping requests.
 
