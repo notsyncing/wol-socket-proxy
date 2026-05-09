@@ -1,14 +1,33 @@
 {
+    "machines": {
+        "some-server": {
+            "mac_address": "11:22:33:44:55:66",
+            "wake_up_method": "ipmi",
+            "ipmi_config_name": "some-server-ipmi",
+            "online_check_method": "http",
+            "online_check_http_url": "http://192.168.1.124/health",
+            "online_check_timeout": 300,
+            "online_check_http_expected_code": 200,
+            "ipmi_force_reset_if_power_up_failed": true,
+            "ipmi_max_reset_try_count": 3
+        }
+    },
     "routes": [
         {
             "local_address": "0.0.0.0",
             "local_port": 12345,
-            "target_address": "192.168.0.100",
-            "target_port": 22,
+            "target_machine_name": "some-server",
+            "target_address": "192.168.1.124",
+            "target_port": 12345,
             "protocol": "tcp"
         }
     ],
-    "mac_mappings": {
-        "192.168.0.100": "11:22:33:44:55:66"
-    }
+    "ipmi_configs": [
+        {
+            "name": "some-server-ipmi",
+            "redfish_url": "https://192.168.1.123/",
+            "username": "admin",
+            "password": "123456"
+        }
+    ]
 }

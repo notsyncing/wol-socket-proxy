@@ -8,5 +8,6 @@ services:
       - /mnt/data/wolsocketproxy/config:/app/config:Z
     restart: always
     # Only host network can forward wol packets
+    # If you only use IPMI, then you do not need this
     network_mode: host
 
