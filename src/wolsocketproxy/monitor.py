@@ -63,9 +63,7 @@ class Monitor:
                 assert conf.online_check_http_url is not None
 
                 resp_future = fetch(
-                    session,
-                    conf.online_check_http_url,
-                    timeout=ClientTimeout(total=conf.online_check_timeout)
+                    session, conf.online_check_http_url, timeout=ClientTimeout(total=conf.online_check_timeout)
                 )
 
                 result_names.append(name)

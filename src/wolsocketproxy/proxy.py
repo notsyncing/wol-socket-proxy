@@ -52,7 +52,7 @@ class IPMIConfig:
 class ProxyConfig:
     routes: list[ProxyRoute]
     machines: dict[str, MachineConfig] | None = None
-    mac_mappings: dict[str, str] | None = None      # Deprecated, use machines[n].mac_address instead
+    mac_mappings: dict[str, str] | None = None  # Deprecated, use machines[n].mac_address instead
     ipmi_configs: list[IPMIConfig] | None = None
 
 
@@ -66,12 +66,7 @@ class ProxyUdpProtocol(asyncio.DatagramProtocol):
     _target_pair: tuple[str, int]
 
     def __init__(
-        self,
-        proxy: "Proxy",
-        monitor: Monitor,
-        target_machine_name: str,
-        target_address: str,
-        target_port: int
+        self, proxy: "Proxy", monitor: Monitor, target_machine_name: str, target_address: str, target_port: int
     ) -> None:
         self._proxy = proxy
         self._monitor = monitor
@@ -81,7 +76,7 @@ class ProxyUdpProtocol(asyncio.DatagramProtocol):
         self._target_pair = (target_address, target_port)
 
     @override
-    def connection_made(self, transport: asyncio.transports.DatagramTransport) -> None:     # type: ignore[override]
+    def connection_made(self, transport: asyncio.transports.DatagramTransport) -> None:  # type: ignore[override]
         self._transport = transport
 
     @override
@@ -204,7 +199,7 @@ class Proxy:
         finally:
             writer.close()
 
-    def __make_tcp_route_handler(self, target_machine_name: str, target_address: str, target_port: int) -> Any:   # noqa: ANN401
+    def __make_tcp_route_handler(self, target_machine_name: str, target_address: str, target_port: int) -> Any:  # noqa: ANN401
         async def handler(local_reader: asyncio.StreamReader, local_writer: asyncio.StreamWriter) -> None:
             if not self._monitor.is_available(target_machine_name):
                 await self._wake_up_target(target_machine_name)
@@ -229,9 +224,7 @@ class Proxy:
         loop = asyncio.get_event_loop()
 
         cr = loop.create_datagram_endpoint(
-            lambda: ProxyUdpProtocol(
-                self, self._monitor, target_machine_name, route.target_address, route.target_port
-            ),
+            lambda: ProxyUdpProtocol(self, self._monitor, target_machine_name, route.target_address, route.target_port),
             local_addr=(route.local_address, route.local_port),
         )
 
@@ -271,7 +264,8 @@ class Proxy:
                 if machine.ipmi_reset_retried_count > machine.ipmi_max_reset_try_count:
                     self._log.error(
                         "Target %s still not online after %d IPMI resets, will not retry!",
-                        target_machine_name, machine.ipmi_reset_retried_count
+                        target_machine_name,
+                        machine.ipmi_reset_retried_count,
                     )
 
                     raise ConnectionAbortedError(f"Target {target_machine_name} does not wake up!")
@@ -300,11 +294,7 @@ class Proxy:
             await asyncio.to_thread(ipmi_client.login, auth="session")
 
             await perform_ipmi_action(
-                ipmi_client,
-                "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
-                body={
-                    "ResetType": reset_type
-                }
+                ipmi_client, "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset", body={"ResetType": reset_type}
             )
         finally:
             await asyncio.to_thread(ipmi_client.logout)
@@ -326,4 +316,3 @@ class Proxy:
         await self.__call_reset_on_ipmi(ipmi_config, "PowerCycle")
 
         self._log.info("Target %s power-cycle succeeded, waiting for online...", target_address)
-
