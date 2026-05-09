@@ -66,7 +66,7 @@ The `wolsocketproxy.conf` has the following structure:
                                                                         //   "http" - You must specify "online_check_http_url"
                                                                         //   "ping" - You must specify "ip_address"
             "online_check_http_url": "http://192.168.1.124/health",     // The URL used to check if machine is online, optional
-            "online_check_timeout": 300,                                // Timeout when checking machine is online, seconds, optional, default is 300
+            "online_check_timeout": 300,                                // Timeout when checking machine is online, seconds, optional, default is 60
             "online_check_http_expected_code": 200,                     // Expected HTTP status code when using "http" method, optional, default is 200
             "ipmi_force_reset_if_power_up_failed": true,                // Use IPMI power reset if this machine is not online after timeout, optional, default is false
             "ipmi_max_reset_try_count": 3                               // Max IPMI power reset retry count before giving-up, optional, default is 3
