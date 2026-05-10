@@ -124,16 +124,16 @@ wheels = [
 
 [[package]]
 name = "build"
-version = "1.4.2"
+version = "1.5.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
     { name = "colorama", marker = "os_name == 'nt'" },
     { name = "packaging" },
     { name = "pyproject-hooks" },
 ]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/6c/1d/ab15c8ac57f4ee8778d7633bc6685f808ab414437b8644f555389cdc875e/build-1.4.2.tar.gz", hash = "sha256:35b14e1ee329c186d3f08466003521ed7685ec15ecffc07e68d706090bf161d1" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/78/e0/df5e171f685f82f37b12e1f208064e24244911079d7b767447d1af7e0d70/build-1.5.0.tar.gz", hash = "sha256:302c22c3ba2a0fd5f3911918651341ebb3896176cbdec15bd421f80b1afc7647" }
 wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/4a/57/3b7d4dd193ade4641c865bc2b93aeeb71162e81fc348b8dad020215601ed/build-1.4.2-py3-none-any.whl", hash = "sha256:7a4d8651ea877cb2a89458b1b198f2e69f536c95e89129dbf5d448045d60db88" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/0d/fe/6bea5c9162869c5beba5d9c8abbed835ec85bf1ec1fba05a3822325c45f3/build-1.5.0-py3-none-any.whl", hash = "sha256:13f3eecb844759ab66efec90ca17639bbf14dc06cb2fdf37a9010322d9c50a6f" },
 ]
 
 [package.optional-dependencies]
@@ -771,7 +771,7 @@ wheels = [
 
 [[package]]
 name = "wolsocketproxy"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -798,7 +798,7 @@ lint = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = "==3.13.5" },
-    { name = "build", extras = ["virtualenv"], marker = "extra == 'build'", specifier = "==1.4.2" },
+    { name = "build", extras = ["virtualenv"], marker = "extra == 'build'", specifier = "==1.5.0" },
     { name = "dataclass-wizard", specifier = "==0.39.1" },
     { name = "icmplib", specifier = "==3.0.4" },
     { name = "redfish", specifier = "==3.3.5" },
