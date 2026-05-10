@@ -12,6 +12,8 @@ from aiohttp import web
 from aiohttp.web import Request, Response
 from setproctitle import setproctitle
 
+from wolsocketproxy.common import URL_WATCHDOG_FEED
+
 
 @dataclass
 class KeepAliveConfig:
@@ -41,11 +43,7 @@ class KeepAliveDaemon:
 
         self._web_app = web.Application()
 
-        self._web_app.add_routes(
-            [
-                web.get("/watchdog/feed", self._handle_watchdog_feed)
-            ]
-        )
+        self._web_app.add_routes([web.get(URL_WATCHDOG_FEED, self._handle_watchdog_feed)])
 
     async def _watchdog_timer(self) -> None:
         while True:
@@ -97,8 +95,7 @@ class KeepAliveDaemon:
             return True
 
         self._log.info(
-            "Started special process with name %s, PID %d",
-            self._config.special_process_name, self._special_process_id
+            "Started special process with name %s, PID %d", self._config.special_process_name, self._special_process_id
         )
 
         return False
@@ -123,7 +120,9 @@ class KeepAliveDaemon:
 
         self._log.info(
             "Keep-alive daemon started at %s:%d, watchdog feed interval %ds.",
-            self._config.listen_address, self._config.listen_port, self._config.watchdog_feed_interval
+            self._config.listen_address,
+            self._config.listen_port,
+            self._config.watchdog_feed_interval,
         )
 
         web.run_app(self._web_app, host=self._config.listen_address, port=self._config.listen_port)

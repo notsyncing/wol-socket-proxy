@@ -9,7 +9,9 @@
             "online_check_timeout": 300,
             "online_check_http_expected_code": 200,
             "ipmi_force_reset_if_power_up_failed": true,
-            "ipmi_max_reset_try_count": 3
+            "ipmi_max_reset_try_count": 3,
+            "keep_alive_mode": true,
+            "keep_alive_mode_base_url": "http://192.168.1.124:8080"
         }
     },
     "routes": [

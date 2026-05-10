@@ -69,7 +69,10 @@ The `wolsocketproxy.conf` has the following structure:
             "online_check_timeout": 300,                                // Timeout when checking machine is online, seconds, optional, default is 60
             "online_check_http_expected_code": 200,                     // Expected HTTP status code when using "http" method, optional, default is 200
             "ipmi_force_reset_if_power_up_failed": true,                // Use IPMI power reset if this machine is not online after timeout, optional, default is false
-            "ipmi_max_reset_try_count": 3                               // Max IPMI power reset retry count before giving-up, optional, default is 3
+            "ipmi_max_reset_try_count": 3,                              // Max IPMI power reset retry count before giving-up, optional, default is 3
+            "keep_alive_mode": true,                                    // Indicates whether this machine has a keep-alive daemon, optional, default is false
+                                                                        // If you enable this, wolsocketproxy will send a request when there is any traffic
+            "keep_alive_mode_base_url": "http://192.168.1.124:8080"     // Keep-alive daemon provided URL, optional
         },
         // ... more machines ...
     },
@@ -131,3 +134,5 @@ The config file `wolsocketproxy.conf` should look like the following:
 You need to periodically send an HTTP GET request to `/watchdog/feed` at the `listen_port` in `watchdog_feed_interval` time,
 or the special process will be killed.
 You can combine this mode with `circadian`'s `process_block` config to keep it from auto-suspending.
+
+If you enable `keep_alive_mode` in proxy mode's config, the proxy will send requests to `/watchdog/feed` of this machine whenever there is any traffic towards this machine through it.

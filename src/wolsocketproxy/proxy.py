@@ -3,11 +3,14 @@ import contextlib
 import logging
 from dataclasses import dataclass
 from logging import Logger
+from threading import Thread
 from typing import Any, Literal, override
 
+import aiohttp
 import wakeonlan
 from redfish.rest.v1 import HttpClient, redfish_client
 
+from wolsocketproxy.common import URL_WATCHDOG_FEED
 from wolsocketproxy.monitor import Monitor, MonitorConfig
 from wolsocketproxy.utils import perform_ipmi_action
 
@@ -28,6 +31,10 @@ class MachineConfig:
     online_check_http_url: str | None = None
     online_check_http_expected_code: int = 200
     online_check_timeout: int = 60
+
+    keep_alive_mode: bool = False
+    keep_alive_mode_base_url: str | None = None
+    keep_alive_min_interval: int = 1
 
 
 @dataclass
@@ -56,6 +63,42 @@ class ProxyConfig:
     ipmi_configs: list[IPMIConfig] | None = None
 
 
+class TargetKeepAliveSender:
+    _target_url: str
+    _keep_alive_min_interval: int
+    _loop: asyncio.AbstractEventLoop
+    _queue: asyncio.Queue
+
+    def __init__(self, target_base_url: str, keep_alive_min_interval: int) -> None:
+        self._target_url = target_base_url.removesuffix("/") + URL_WATCHDOG_FEED
+        self._keep_alive_min_interval = keep_alive_min_interval
+
+        self._loop = asyncio.new_event_loop()
+        self._queue = asyncio.Queue(1)
+
+        def _loop() -> None:
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_until_complete(self._send_worker())
+
+        Thread(target=_loop, daemon=True).start()
+
+    async def _send_worker(self) -> None:
+        while True:
+            await self._queue.get()
+
+            async with aiohttp.request("GET", self._target_url) as resp:
+                await resp.json()
+
+            await asyncio.sleep(self._keep_alive_min_interval)
+
+    def schedule_send(self) -> None:
+        def _no_exception_put() -> None:
+            with contextlib.suppress(asyncio.QueueFull):
+                self._queue.put_nowait(1)
+
+        self._loop.call_soon_threadsafe(_no_exception_put)
+
+
 class ProxyUdpProtocol(asyncio.DatagramProtocol):
     _proxy: "Proxy"
     _monitor: Monitor
@@ -63,16 +106,24 @@ class ProxyUdpProtocol(asyncio.DatagramProtocol):
     _target_machine_name: str
     _target_address: str
     _target_port: int
+    _target_keep_alive_sender: TargetKeepAliveSender | None = None
     _target_pair: tuple[str, int]
 
     def __init__(
-        self, proxy: "Proxy", monitor: Monitor, target_machine_name: str, target_address: str, target_port: int
+        self,
+        proxy: "Proxy",
+        monitor: Monitor,
+        target_machine_name: str,
+        target_address: str,
+        target_port: int,
+        target_keep_alive_sender: TargetKeepAliveSender | None = None,
     ) -> None:
         self._proxy = proxy
         self._monitor = monitor
         self._target_machine_name = target_machine_name
         self._target_address = target_address
         self._target_port = target_port
+        self._target_keep_alive_sender = target_keep_alive_sender
         self._target_pair = (target_address, target_port)
 
     @override
@@ -91,6 +142,9 @@ class ProxyUdpProtocol(asyncio.DatagramProtocol):
             await self._proxy._wake_up_target(self._target_machine_name)  # noqa: SLF001
 
         self._transport.sendto(data, self._target_pair)
+
+        if self._target_keep_alive_sender is not None:
+            self._target_keep_alive_sender.schedule_send()
 
 
 class Proxy:
@@ -180,9 +234,23 @@ class Proxy:
 
     def __create_tcp_route(self, route: ProxyRoute) -> None:
         assert route.target_machine_name is not None
+        machine_config = self._machines[route.target_machine_name]
+        target_keep_alive_sender = None
+
+        if machine_config.keep_alive_mode:
+            assert machine_config.keep_alive_mode_base_url is not None
+
+            target_keep_alive_sender = TargetKeepAliveSender(
+                machine_config.keep_alive_mode_base_url, machine_config.keep_alive_min_interval
+            )
 
         cr = asyncio.start_server(
-            self.__make_tcp_route_handler(route.target_machine_name, route.target_address, route.target_port),
+            self.__make_tcp_route_handler(
+                route.target_machine_name,
+                route.target_address,
+                route.target_port,
+                target_keep_alive_sender,
+            ),
             route.local_address,
             route.local_port,
         )
@@ -190,16 +258,31 @@ class Proxy:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(cr)
 
-    async def __pipe(self, target_address: str, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def __pipe(
+        self,
+        target_address: str,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        target_keep_alive_sender: TargetKeepAliveSender | None = None,
+    ) -> None:
         try:
             while not reader.at_eof():
                 writer.write(await reader.read(2048))
+
+                if target_keep_alive_sender is not None:
+                    target_keep_alive_sender.schedule_send()
         except ConnectionResetError:
             self._log.warning("Connection reset by target %s", target_address)
         finally:
             writer.close()
 
-    def __make_tcp_route_handler(self, target_machine_name: str, target_address: str, target_port: int) -> Any:  # noqa: ANN401
+    def __make_tcp_route_handler(
+        self,
+        target_machine_name: str,
+        target_address: str,
+        target_port: int,
+        target_keep_alive_sender: TargetKeepAliveSender | None = None,
+    ) -> Any:  # noqa: ANN401
         async def handler(local_reader: asyncio.StreamReader, local_writer: asyncio.StreamWriter) -> None:
             if not self._monitor.is_available(target_machine_name):
                 await self._wake_up_target(target_machine_name)
@@ -211,8 +294,8 @@ class Proxy:
                 self._log.error("Unable to open connection to %s:%d", target_address, target_port)
                 raise e
 
-            send_pipe = self.__pipe(target_address, local_reader, target_writer)
-            recv_pipe = self.__pipe(target_address, target_reader, local_writer)
+            send_pipe = self.__pipe(target_address, local_reader, target_writer, target_keep_alive_sender)
+            recv_pipe = self.__pipe(target_address, target_reader, local_writer, target_keep_alive_sender)
             await asyncio.gather(send_pipe, recv_pipe)
 
         return handler
@@ -221,10 +304,27 @@ class Proxy:
         target_machine_name = route.target_machine_name
         assert target_machine_name is not None
 
+        machine_config = self._machines[target_machine_name]
+        target_keep_alive_sender = None
+
+        if machine_config.keep_alive_mode:
+            assert machine_config.keep_alive_mode_base_url is not None
+
+            target_keep_alive_sender = TargetKeepAliveSender(
+                machine_config.keep_alive_mode_base_url, machine_config.keep_alive_min_interval
+            )
+
         loop = asyncio.get_event_loop()
 
         cr = loop.create_datagram_endpoint(
-            lambda: ProxyUdpProtocol(self, self._monitor, target_machine_name, route.target_address, route.target_port),
+            lambda: ProxyUdpProtocol(
+                self,
+                self._monitor,
+                target_machine_name,
+                route.target_address,
+                route.target_port,
+                target_keep_alive_sender,
+            ),
             local_addr=(route.local_address, route.local_port),
         )
 

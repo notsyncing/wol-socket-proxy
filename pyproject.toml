@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wolsocketproxy"
-version = "0.3.0"
+version = "0.3.1"
 description = "A socket proxy with wake-on-lan feature."
 authors = [
     {name = "Song Fuchang", email = "song.fc@gmail.com"}
@@ -72,4 +72,5 @@ lint.ignore = [
     "ISC001",
     "TRY003",
     "TRY201",
+    "PLR0913",
 ]
