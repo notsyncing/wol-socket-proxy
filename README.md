@@ -99,3 +99,35 @@ The `wolsocketproxy.conf` has the following structure:
     ]
 }
 ```
+
+## Additional modes
+
+### Keep-alive daemon mode
+
+This mode is used for running on target machine with auto-suspend (e.g. running `circadian` or similar), to keep the target
+machine from auto suspending when running tasks.
+
+Use the following command on the target machine to enter this mode:
+
+```bash
+wolsocketproxy -k
+```
+
+The config file `wolsocketproxy.conf` should look like the following:
+
+
+```json5
+// Keep-alive daemon mode
+{
+    "listen_address": "0.0.0.0",                // The address to listen for HTTP server, default is 127.0.0.1
+    "listen_port": 18080,                       // The port to listen for HTTP server, default is 18080
+    "watchdog_feed_interval": 60,               // Watchdog feed interval, seconds, default is 600
+    "keep_alive_method": "special_process",     // How to keep target machine alive, default is "special_process"
+                                                //   "special_process" - Fork a child process with specified name
+    "special_process_name": "wsp-keepalive",    // The display name of the forked child process, default is "wsp-keepalive"
+}
+```
+
+You need to periodically send an HTTP GET request to `/watchdog/feed` at the `listen_port` in `watchdog_feed_interval` time,
+or the special process will be killed.
+You can combine this mode with `circadian`'s `process_block` config to keep it from auto-suspending.
