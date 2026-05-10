@@ -11,3 +11,11 @@ services:
     # If you only use IPMI, then you do not need this
     network_mode: host
 
+  # Keep-alive daemon on target machine
+  wolsocketproxy-keepalive:
+    image: ghcr.io/notsyncing/wol-socket-proxy:main
+    volumes:
+      - /mnt/data/wolsocketproxy/config:/app/config:Z
+    restart: always
+    # Required to override original command
+    command: ["python", "-m", "wolsocketproxy", "-k", "-c", "/app/config/wolsocketproxy.conf"]

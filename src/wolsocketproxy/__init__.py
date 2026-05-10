@@ -2,17 +2,39 @@ import json
 import logging
 from argparse import ArgumentParser
 from pathlib import Path
+from sys import stdout
 
 import dataclass_wizard
 
+from wolsocketproxy.keepalive import KeepAliveConfig, KeepAliveDaemon
 from wolsocketproxy.proxy import Proxy, ProxyConfig
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.StreamHandler(
+                stream=stdout,
+            ),
+        ],
+        force=True,
+    )
+
     log = logging.getLogger()
 
     parser = ArgumentParser(prog="wolsocketproxy", description="A socket proxy with wake-on-lan feature.")
+
+    parser.add_argument(
+        "-k",
+        "--keep-alive",
+        dest="keep_alive_mode",
+        default=False,
+        action="store_true",
+        help="Start in keep-alive daemon mode",
+    )
 
     parser.add_argument(
         "-c",
@@ -36,9 +58,18 @@ def main() -> None:
         return
 
     config_data = json.loads(config_path.read_text())
-    config = dataclass_wizard.fromdict(ProxyConfig, config_data)
 
-    log.info("Loaded config from %s", config_path)
+    if args.keep_alive_mode:
+        config = dataclass_wizard.fromdict(KeepAliveConfig, config_data)
 
-    proxy = Proxy(config)
-    proxy.start()
+        log.info("Loaded keep-alive mode config from %s", config_path)
+
+        keep_alive_daemon = KeepAliveDaemon(config)
+        keep_alive_daemon.start()
+    else:
+        config = dataclass_wizard.fromdict(ProxyConfig, config_data)
+
+        log.info("Loaded proxy mode config from %s", config_path)
+
+        proxy = Proxy(config)
+        proxy.start()

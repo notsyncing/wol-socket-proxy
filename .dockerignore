@@ -6,5 +6,6 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 wolsocketproxy.conf
+wolsocketproxy-keepalive.conf
 *.egg-info/
 .vscode/

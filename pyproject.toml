@@ -23,6 +23,7 @@ dependencies = [
     "dataclass-wizard==0.39.1",
     "icmplib==3.0.4",
     "redfish==3.3.5",
+    "setproctitle==1.3.7",
     "wakeonlan==3.1.0",
 ]
 
@@ -52,6 +53,7 @@ src = ["src"]
 target-version = "py312"
 lint.select = ["ALL"]
 lint.ignore = [
+    "ASYNC110",
     "COM812",
     "D100",
     "D101",
@@ -62,6 +64,7 @@ lint.ignore = [
     "D203",
     "D211",
     "D213",
+    "DTZ005",
     "S101",
     "EM102",
     "FBT001",
