@@ -64,6 +64,8 @@ class ProxyConfig:
 
 
 class TargetKeepAliveSender:
+    _log: logging.Logger = logging.getLogger(__name__)
+
     _target_url: str
     _keep_alive_min_interval: int
     _loop: asyncio.AbstractEventLoop
@@ -86,8 +88,15 @@ class TargetKeepAliveSender:
         while True:
             await self._queue.get()
 
-            async with aiohttp.request("GET", self._target_url) as resp:
-                await resp.json()
+            try:
+                async with aiohttp.request(
+                    "GET",
+                    self._target_url,
+                    timeout=aiohttp.ClientTimeout(total=5),
+                ) as resp:
+                    await resp.json()
+            except (aiohttp.ClientError, aiohttp.ClientResponseError):
+                self._log.warning("Failed to send target keep alive request to %s", self._target_url, exc_info=True)
 
             await asyncio.sleep(self._keep_alive_min_interval)
 
