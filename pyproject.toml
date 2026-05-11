@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wolsocketproxy"
-version = "0.3.1"
+version = "0.4.0"
 description = "A socket proxy with wake-on-lan feature."
 authors = [
     {name = "Song Fuchang", email = "song.fc@gmail.com"}
