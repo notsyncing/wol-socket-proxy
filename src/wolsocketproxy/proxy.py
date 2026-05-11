@@ -1,18 +1,28 @@
 import asyncio
 import contextlib
 import logging
+import time
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+from datetime import datetime
 from logging import Logger
-from threading import Thread
+from threading import Event, Thread
 from typing import Any, Literal, override
 
 import aiohttp
 import wakeonlan
+from croniter import croniter
 from redfish.rest.v1 import HttpClient, redfish_client
 
 from wolsocketproxy.common import URL_WATCHDOG_FEED
 from wolsocketproxy.monitor import Monitor, MonitorConfig
 from wolsocketproxy.utils import perform_ipmi_action
+
+
+@dataclass
+class ScheduledPowerUpTime:
+    cron: str
+    keep_alive_time: int = 0
 
 
 @dataclass
@@ -35,6 +45,8 @@ class MachineConfig:
     keep_alive_mode: bool = False
     keep_alive_mode_base_url: str | None = None
     keep_alive_min_interval: int = 1
+
+    scheduled_power_up_times: list[ScheduledPowerUpTime] | None = None
 
 
 @dataclass
@@ -70,6 +82,7 @@ class TargetKeepAliveSender:
     _keep_alive_min_interval: int
     _loop: asyncio.AbstractEventLoop
     _queue: asyncio.Queue
+    _stop_event: Event
 
     def __init__(self, target_base_url: str, keep_alive_min_interval: int) -> None:
         self._target_url = target_base_url.removesuffix("/") + URL_WATCHDOG_FEED
@@ -77,28 +90,32 @@ class TargetKeepAliveSender:
 
         self._loop = asyncio.new_event_loop()
         self._queue = asyncio.Queue(1)
+        self._stop_event = Event()
 
-        def _loop() -> None:
+        def _run_loop() -> None:
             asyncio.set_event_loop(self._loop)
             self._loop.run_until_complete(self._send_worker())
 
-        Thread(target=_loop, daemon=True).start()
+        Thread(target=_run_loop, daemon=True).start()
 
     async def _send_worker(self) -> None:
-        while True:
+        while not self._stop_event.is_set():
             await self._queue.get()
-
-            try:
-                async with aiohttp.request(
-                    "GET",
-                    self._target_url,
-                    timeout=aiohttp.ClientTimeout(total=5),
-                ) as resp:
-                    await resp.json()
-            except (aiohttp.ClientError, aiohttp.ClientResponseError):
-                self._log.warning("Failed to send target keep alive request to %s", self._target_url, exc_info=True)
-
+            if self._stop_event.is_set():
+                break
+            await self._send()
             await asyncio.sleep(self._keep_alive_min_interval)
+
+    async def _send(self) -> None:
+        try:
+            async with aiohttp.request(
+                "GET",
+                self._target_url,
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                await resp.json()
+        except (aiohttp.ClientError, aiohttp.ClientResponseError):
+            self._log.warning("Failed to send target keep alive request to %s", self._target_url, exc_info=True)
 
     def schedule_send(self) -> None:
         def _no_exception_put() -> None:
@@ -106,6 +123,118 @@ class TargetKeepAliveSender:
                 self._queue.put_nowait(1)
 
         self._loop.call_soon_threadsafe(_no_exception_put)
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        with contextlib.suppress(asyncio.QueueFull):
+            self._loop.call_soon_threadsafe(lambda: self._queue.put_nowait(None))
+
+
+class ScheduledPowerUpManager:
+    _log: Logger = logging.getLogger(__name__)
+
+    _machines: dict[str, MachineConfig]
+    _wake_up_callback: Callable[[str], Coroutine[Any, Any, None]]
+    _loop: asyncio.AbstractEventLoop
+    _keep_alive_end_times: dict[str, float]
+
+    def __init__(
+        self,
+        machines: dict[str, MachineConfig],
+        wake_up_callback: Callable[[str], Coroutine[Any, Any, None]],
+    ) -> None:
+        self._machines = machines
+        self._wake_up_callback = wake_up_callback
+        self._keep_alive_end_times = {}
+
+    def start(self) -> None:
+        self._loop = asyncio.new_event_loop()
+
+        def _run_loop() -> None:
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_forever()
+
+        Thread(target=_run_loop, daemon=True).start()
+
+        for machine_name, machine in self._machines.items():
+            schedules = machine.scheduled_power_up_times
+            if not schedules:
+                continue
+
+            if machine.keep_alive_mode_base_url is None:
+                self._log.warning(
+                    "Machine %s has scheduled_power_up_times but no keep_alive_mode_base_url configured, "
+                    "keep-alive after power-up will be skipped",
+                    machine_name,
+                )
+
+            for schedule in schedules:
+                asyncio.run_coroutine_threadsafe(
+                    self._process_schedule(machine_name, machine, schedule),
+                    self._loop,
+                )
+
+    async def _process_schedule(
+        self,
+        machine_name: str,
+        machine: MachineConfig,
+        schedule: ScheduledPowerUpTime,
+    ) -> None:
+        while True:
+            now = datetime.now()
+            cron = croniter(schedule.cron, now)
+            next_time = cron.get_next(datetime)
+
+            delay = (next_time - datetime.now()).total_seconds()
+            if delay > 0:
+                await asyncio.sleep(delay)
+
+            self._log.info(
+                "Scheduled power-up triggered for %s (cron: %s)",
+                machine_name,
+                schedule.cron,
+            )
+
+            try:
+                await self._wake_up_callback(machine_name)
+            except ConnectionAbortedError:
+                self._log.error(
+                    "Scheduled power-up failed for %s, will retry at next schedule time",
+                    machine_name,
+                )
+                continue
+
+            if schedule.keep_alive_time > 0 and machine.keep_alive_mode_base_url is not None:
+                await self._run_keep_alive(machine_name, machine, schedule.keep_alive_time)
+
+
+    async def _run_keep_alive(
+        self,
+        machine_name: str,
+        machine: MachineConfig,
+        keep_alive_time: int,
+    ) -> None:
+        assert machine.keep_alive_mode_base_url is not None
+        new_end = time.monotonic() + keep_alive_time
+        current_end = self._keep_alive_end_times.get(machine_name, 0.0)
+
+        if new_end > current_end:
+            self._keep_alive_end_times[machine_name] = new_end
+
+        if current_end > time.monotonic():
+            return
+
+        sender = TargetKeepAliveSender(
+            machine.keep_alive_mode_base_url,
+            machine.keep_alive_min_interval,
+        )
+
+        try:
+            while time.monotonic() < self._keep_alive_end_times.get(machine_name, 0.0):
+                sender.schedule_send()
+                await asyncio.sleep(machine.keep_alive_min_interval)
+        finally:
+            sender.stop()
 
 
 class ProxyUdpProtocol(asyncio.DatagramProtocol):
@@ -163,6 +292,7 @@ class Proxy:
     _machines: dict[str, MachineConfig]
     _routes: list[ProxyRoute]
     _ipmi_configs: dict[str, IPMIConfig]
+    _scheduled_power_up_manager: ScheduledPowerUpManager
 
     def __init__(self, config: ProxyConfig) -> None:
         self._config = config
@@ -202,6 +332,11 @@ class Proxy:
             }
         )
 
+        self._scheduled_power_up_manager = ScheduledPowerUpManager(
+            machines=self._machines,
+            wake_up_callback=self._wake_up_target,
+        )
+
     def start(self) -> None:
         self._monitor.start()
 
@@ -209,6 +344,8 @@ class Proxy:
             self.__create_route(route)
 
         loop = asyncio.get_event_loop()
+
+        self._scheduled_power_up_manager.start()
 
         self._log.info("Proxy server started.")
 

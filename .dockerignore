@@ -9,3 +9,4 @@ wolsocketproxy.conf
 wolsocketproxy-keepalive.conf
 *.egg-info/
 .vscode/
+.kilo/

@@ -11,7 +11,13 @@
             "ipmi_force_reset_if_power_up_failed": true,
             "ipmi_max_reset_try_count": 3,
             "keep_alive_mode": true,
-            "keep_alive_mode_base_url": "http://192.168.1.124:8080"
+            "keep_alive_mode_base_url": "http://192.168.1.124:8080",
+            "scheduled_power_up_times": [
+                {
+                    "cron": "0 7 * * 1-5",
+                    "keep_alive_time": 7200
+                }
+            ]
         }
     },
     "routes": [

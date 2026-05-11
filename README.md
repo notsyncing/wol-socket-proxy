@@ -71,8 +71,14 @@ The `wolsocketproxy.conf` has the following structure:
             "ipmi_force_reset_if_power_up_failed": true,                // Use IPMI power reset if this machine is not online after timeout, optional, default is false
             "ipmi_max_reset_try_count": 3,                              // Max IPMI power reset retry count before giving-up, optional, default is 3
             "keep_alive_mode": true,                                    // Indicates whether this machine has a keep-alive daemon, optional, default is false
-                                                                        // If you enable this, wolsocketproxy will send a request when there is any traffic
-            "keep_alive_mode_base_url": "http://192.168.1.124:8080"     // Keep-alive daemon provided URL, optional
+                                                                         // If you enable this, wolsocketproxy will send a request when there is any traffic
+            "keep_alive_mode_base_url": "http://192.168.1.124:8080",     // Keep-alive daemon provided URL, optional
+            "scheduled_power_up_times": [                               // Scheduled power-up times, optional
+                {
+                    "cron": "0 7 * * 1-5",                             // Cron expression for auto power-up
+                    "keep_alive_time": 7200                             // Send keep-alive requests for N seconds after power-up
+                }
+            ]
         },
         // ... more machines ...
     },
@@ -136,3 +142,16 @@ or the special process will be killed.
 You can combine this mode with `circadian`'s `process_block` config to keep it from auto-suspending.
 
 If you enable `keep_alive_mode` in proxy mode's config, the proxy will send requests to `/watchdog/feed` of this machine whenever there is any traffic towards this machine through it.
+
+### Scheduled power-up
+
+You can configure `scheduled_power_up_times` in each machine entry to automatically power up the machine at specified times using
+a cron expression. After the machine comes online, the proxy sends keep-alive requests to the machine's keep-alive daemon
+(for the duration specified by `keep_alive_time`) to prevent it from auto-suspending during the expected usage window.
+
+Each entry in `scheduled_power_up_times` contains:
+- `cron`: A standard 5-field cron expression (e.g. `"0 7 * * 1-5"` for weekdays at 7:00)
+- `keep_alive_time`: Duration in seconds to send keep-alive requests after power-up (e.g. `7200` for 2 hours)
+
+If multiple entries overlap in time, the keep-alive period is automatically extended to cover the longest window, and no
+duplicate keep-alive requests are sent.
